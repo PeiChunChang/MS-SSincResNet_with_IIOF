@@ -1,3 +1,10 @@
+import math
+import torch
+import numpy as np
+import torch.nn as nn
+import torch.nn.functional as F
+import torchvision.models as models
+
 class SquaredSincConv_fast(nn.Module):
     @staticmethod
     def to_mel(hz):
@@ -94,32 +101,50 @@ class SquaredSincConv_fast(nn.Module):
         return F.conv1d(waveforms, self.filters, stride=self.stride,
                         padding=self.padding, dilation=self.dilation,
                          bias=None, groups=1)
+class MS_SSincNet(nn.Module):
+    def __init__(self, out_channels, kernel_size, length):
+        super().__init__()
+        self.ssincnet1 = nn.Sequential(
+            SquaredSincConv_fast(out_channels=out_channels, kernel_size=kernel_size[0]),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.AdaptiveAvgPool1d(length))
+        self.ssincnet2 = nn.Sequential(
+            SquaredSincConv_fast(out_channels=out_channels, kernel_size=kernel_size[1]),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.AdaptiveAvgPool1d(length))
+        self.ssincnet3 = nn.Sequential(
+            SquaredSincConv_fast(out_channels=out_channels, kernel_size=kernel_size[2]),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.AdaptiveAvgPool1d(length))
+    def forward(self, x):
+        x = torch.cat((self.ssincnet1(x).unsqueeze_(dim=1),
+                       self.ssincnet2(x).unsqueeze_(dim=1),
+                       self.ssincnet3(x).unsqueeze_(dim=1)), dim=1)
+        return x
 class myResnet(nn.Module):
     def __init__(self, pretrained=True):
-        super(myResnet5, self).__init__()
-        self.resnet18_layer3 = nn.Sequential(
-                    *list(models.resnet18(pretrained=True).children())[:-3]
+        super().__init__()
+        self.resnet18_layer4 = nn.Sequential(
+                    *list(models.resnet18(pretrained=pretrained).children())[:-3]
                 )
         self.resnet18_global = nn.Sequential(
-                    *list(models.resnet18(pretrained=True).children())[7:9]
+                    *list(models.resnet18(pretrained=pretrained).children())[7:9]
                 )
     def forward(self, x):
-        feature_layer3 = self.resnet18_layer3(x)
-        feature_global = self.resnet18_global(feature_layer3)
-        return feature_layer3, feature_global
-class myResnet(nn.Module):
-    def __init__(self, pretrained=True):
-        super(myResnet5, self).__init__()
-        self.resnet18_layer3 = nn.Sequential(
-                    *list(models.resnet18(pretrained=True).children())[:-3]
-                )
-        self.resnet18_global = nn.Sequential(
-                    *list(models.resnet18(pretrained=True).children())[7:9]
-                )
+        feature_layer4 = self.resnet18_layer4(x)
+        feature_global = self.resnet18_global(feature_layer4)
+        return feature_layer4, feature_global
+class SPP(nn.Module):
+    def __init__(self, kernel_size):
+        super().__init__()
+        self.avgpool = nn.AdaptiveAvgPool2d(output_size=kernel_size)
     def forward(self, x):
-        feature_layer3 = self.resnet18_layer3(x)
-        feature_global = self.resnet18_global(feature_layer3)
-        return feature_layer3, feature_global
+        local_feat = self.avgpool(x)
+        return local_feat
+
 class OrthogonalFusion(nn.Module):
     def __init__(self):
         super().__init__()
@@ -137,48 +162,34 @@ class OrthogonalFusion(nn.Module):
             return torch.cat([global_feat.expand(orthogonal_comp.size()), orthogonal_comp], dim=1)
         else:
             return orthogonal_comp
+
 class MS_SSincResNet_IIOF(nn.Module):
     def __init__(self):
         super().__init__()
         self.layerNorm = nn.LayerNorm([1, 144000])
-        self.sincNet1 = nn.Sequential(
-            SquaredSincConv_fast(out_channels=160, kernel_size=251),
-            nn.BatchNorm1d(160),
-            nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool1d(2048))
-        self.sincNet2 = nn.Sequential(
-            SquaredSincConv_fast(out_channels=160, kernel_size=501),
-            nn.BatchNorm1d(160),
-            nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool1d(2048))
-        self.sincNet3 = nn.Sequential(
-            SquaredSincConv_fast(out_channels=160, kernel_size=1001),
-            nn.BatchNorm1d(160),
-            nn.ReLU(inplace=True),
-            nn.AdaptiveAvgPool1d(2048))
-
+        self.ms_ssincnet = MS_SSincNet(out_channels=160, kernel_size=[251, 501, 1001], length=2048)
         self.resnet = myResnet(pretrained=True)
-        self.spp = SPP()
+        self.spp = SPP(kernel_size=3)
         self.of = OrthogonalFusion()
-        self.fc = nn.Linear(512*2*9, 2, bias=True)
+        self.fc = nn.Linear(512*2*(3*3), 2, bias=True)
         self.tanh = nn.Tanh()
 
     def forward(self, x):
+        bn = x.size()[0]
+
         x = self.layerNorm(x)
-        x = torch.cat((self.sincNet1(x).unsqueeze_(dim=1),
-                       self.sincNet2(x).unsqueeze_(dim=1),
-                       self.sincNet3(x).unsqueeze_(dim=1)), dim=1)
+        x = self.ms_ssincnet(x)
         local_feat, global_feat = self.resnet(x)
 
         local_feat = self.spp(local_feat)
-        (h1, h2) = torch.split(global_feat, 256, dim=1)
-        h2 = h2.squeeze()
+        (h1, h2) = torch.split(global_feat, local_feat.size()[1], dim=1)
+        h2 = h2.view(bn, -1)
 
-        h1_ = self.of(h1, h2, concat=False).squeeze()
+        h1_ = self.of(h1, h2, concat=False).view(bn, -1)
         x1 = self.of(local_feat, h1_)
         x2 = self.of(local_feat, h2)
 
-        x = torch.cat([x1, x2], dim=1).view(x.size()[0], -1)
+        x = torch.cat([x1, x2], dim=1).view(bn, -1)
         x = self.fc(x)
         x = self.tanh(x)
 
