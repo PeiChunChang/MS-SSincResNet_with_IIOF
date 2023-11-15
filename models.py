@@ -30,8 +30,6 @@ class SquaredSincConv_fast(nn.Module):
         super().__init__()
 
         if in_channels != 1:
-            #msg = (f'SincConv only support one input channel '
-            #       f'(here, in_channels = {in_channels:d}).')
             msg = "SincConv only support one input channel (here, in_channels = {%i})" % (in_channels)
             raise ValueError(msg)
 
@@ -58,6 +56,7 @@ class SquaredSincConv_fast(nn.Module):
         self.max_hz = self.sample_rate / 2
         mel_min = self.to_mel(self.min_hz)
         mel_max = self.to_mel(self.max_hz)
+
         delta_mel = np.abs(mel_max - mel_min) / ( self.out_channels + 1.0)
         frequencies_mel = mel_min + delta_mel*np.arange(0, self.out_channels+2)
         lower_edges = self.to_hz(frequencies_mel[:-2])
@@ -101,6 +100,7 @@ class SquaredSincConv_fast(nn.Module):
         return F.conv1d(waveforms, self.filters, stride=self.stride,
                         padding=self.padding, dilation=self.dilation,
                          bias=None, groups=1)
+
 class MS_SSincNet(nn.Module):
     def __init__(self, out_channels, kernel_size, length):
         super().__init__()
@@ -124,6 +124,7 @@ class MS_SSincNet(nn.Module):
                        self.ssincnet2(x).unsqueeze_(dim=1),
                        self.ssincnet3(x).unsqueeze_(dim=1)), dim=1)
         return x
+
 class myResnet(nn.Module):
     def __init__(self, pretrained=True):
         super().__init__()
@@ -137,6 +138,7 @@ class myResnet(nn.Module):
         feature_layer4 = self.resnet18_layer4(x)
         feature_global = self.resnet18_global(feature_layer4)
         return feature_layer4, feature_global
+
 class SPP(nn.Module):
     def __init__(self, kernel_size):
         super().__init__()
@@ -192,5 +194,4 @@ class MS_SSincResNet_IIOF(nn.Module):
         x = torch.cat([x1, x2], dim=1).view(bn, -1)
         x = self.fc(x)
         x = self.tanh(x)
-
         return x

@@ -1,21 +1,9 @@
-
 import torch
 import torch.utils.data as data
-# import torchvision.transforms as transforms
-
-
-
 
 import os
-# import math
-# import librosa
 import numpy as np
 import scipy.io as sio
-# import scipy.io.wavfile
-# from scipy import signal
-
-# import warnings
-# warnings.filterwarnings("ignore")
 
 torch.manual_seed(1) # cpu
 torch.cuda.manual_seed(1) #gpu
@@ -35,7 +23,7 @@ def transform(data):
     return data
 
 # only static annotations (VA)
-def loader_clip(data_name, anno_name, clip_num, train=True, fs=16000):
+def loader_clip_DEAM(data_name, anno_name, clip_num, train=True, fs=16000):
     data = np.load(data_name)
     data = data / np.max(np.absolute(data))
     data = data.reshape(1, data.shape[0])
@@ -52,8 +40,34 @@ def loader_clip(data_name, anno_name, clip_num, train=True, fs=16000):
         new_data[i] = data[:, i * segment_size : (i + 1) * segment_size]
         new_annos[i] = annos.T
     return new_data, new_annos
+def loader_clip_PMEmo(data_name, anno_name, clip_num, train=True, fs=16000):
+    data = np.load(data_name)
+    data = data / np.max(np.absolute(data))
+    data = data.reshape(1, data.shape[0])
+    annos = sio.loadmat(anno_name)
 
-class myDataset_DEAM(data.Dataset):
+    V_anno = annos['static_anno_V']
+    A_anno = annos['static_anno_A']
+    annos = (np.concatenate((V_anno, A_anno), axis=0) - 0.5) *2
+
+    segment_num = (data.shape[1] / fs) // 9
+    segment_size = int(fs * 9) 
+
+    if train == True:
+        new_data = np.zeros((clip_num, 1, segment_size))
+        new_annos = np.zeros((clip_num, 2))
+        rand_segment = np.random.randint(segment_num, size=clip_num)
+    else:
+        new_data = np.zeros((int(segment_num), 1, segment_size))
+        new_annos = np.zeros((int(segment_num), 2))
+        rand_segment = np.arange(segment_num)
+
+    for (i, index) in enumerate(rand_segment):
+        new_data[i] = data[:, int(index) * segment_size: (int(index) + 1) * segment_size]
+        new_annos[i] = annos.T
+    return new_data, new_annos
+
+class myDataset(data.Dataset):
     def __init__(self, datapath, filename, loader, transform=False, train=True, clip_num=5):
         self.datapath = datapath
         self.annopath = datapath + 'anno_mat/'

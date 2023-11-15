@@ -77,18 +77,18 @@ for cv in range(CV_NUM):
     TEST_PATH = args.dataset_path + 'CV_10_with_val/fold_%d_test.npy' % cv
     VAL_PATH = args.dataset_path + 'CV_10_with_val/fold_%d_val.npy' % cv
 
-    OUTPUT_PATH = './output/fold_%d' % (cv)
+    OUTPUT_PATH = './output_DEAM/fold_%d' % (cv)
     if not os.path.exists(OUTPUT_PATH + '/checkpoints'):
         os.makedirs(OUTPUT_PATH + '/checkpoints')
 
     TrainDataLoader = torch.utils.data.DataLoader(
-        myDataset_DEAM(args.dataset_path, TRAIN_PATH, loader=loader_clip, transform=True, train=True, clip_num=5), 
+        myDataset(args.dataset_path, TRAIN_PATH, loader=loader_clip_DEAM, transform=True, train=True, clip_num=5), 
         batch_size=BATCH_SIZE, shuffle=True, pin_memory=True, num_workers=8)
     TestDataLoader = torch.utils.data.DataLoader(
-        myDataset_DEAM(args.dataset_path, TEST_PATH, transform=False, loader=loader_clip, train=False), 
+        myDataset(args.dataset_path, TEST_PATH, transform=False, loader=loader_clip_DEAM, train=False), 
         batch_size=1, shuffle=False, num_workers=4)
     ValDataLoader = torch.utils.data.DataLoader(
-        myDataset_DEAM(args.dataset_path, VAL_PATH, transform=False, loader=loader_clip, train=False), 
+        myDataset(args.dataset_path, VAL_PATH, transform=False, loader=loader_clip_DEAM, train=False), 
         batch_size=1, shuffle=False, num_workers=4)
 
     model = MS_SSincResNet_IIOF()
