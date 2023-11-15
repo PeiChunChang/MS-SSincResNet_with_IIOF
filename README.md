@@ -16,3 +16,28 @@ This paper is under review.
 python main_DEAM.py --cv_num 10 --dataset_path $deam_path$ --max_epoch 200 --batch_size 4 --init_lr 0.0001
 python main_PMEmo.py --cv_num 10 --dataset_path $deam_path$ --max_epoch 200 --batch_size 4 --init_lr 0.0001
 ```
+## Dataset structure
+———— $dataset_name$/
+    ｜—— anno_mat/
+        ｜—— 1.mat
+        ｜—— 2.mat
+             .
+             .
+             .
+    ｜—— npy/
+        ｜—— 1.npy
+        ｜—— 2.npy
+             .
+             .
+             .
+    ｜—— CV_10_with_val/
+        ｜—— fold_0_train.npy
+        ｜—— fold_0_val.npy
+        ｜—— fold_0_test.npy
+        ｜—— fold_1_train.npy
+        ｜—— fold_1_val.npy
+        ｜—— fold_1_test.npy
+             .
+             .
+             .
+        
