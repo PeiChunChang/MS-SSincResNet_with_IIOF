@@ -17,6 +17,7 @@ python main_DEAM.py --cv_num 10 --dataset_path $deam_path$ --max_epoch 200 --bat
 python main_PMEmo.py --cv_num 10 --dataset_path $deam_path$ --max_epoch 200 --batch_size 4 --init_lr 0.0001
 ```
 ## Dataset structure
+```
 ———— $dataset_name$/
     ｜—— anno_mat/
         ｜—— 1.mat
@@ -40,4 +41,4 @@ python main_PMEmo.py --cv_num 10 --dataset_path $deam_path$ --max_epoch 200 --ba
              .
              .
              .
-        
+ ```       
