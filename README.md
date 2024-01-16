@@ -1,6 +1,6 @@
 # MS-SSincResNet with IIOF
 # IIOF: Intra- and Inter-feature Orthogonal Fusion of Local and Global Features for Music Emotion Recognition
-This paper is under review.
+
 
 ## Prerequisites
 - Ubuntu 22.04
